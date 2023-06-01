@@ -63,7 +63,7 @@ namespace TonDomainInfoBot.Telegram
             }
             else
             {
-                return SendAsync(new SendMessage(message.Chat.Id, "This does not look like domain name. I understand only `*.ton` and `*.t.me` domains.\r\nTry `foundation.ton` for example.") { ParseMode = SendMessage.ParseModeEnum.Markdown });
+                return SendAsync(new SendMessage(message.Chat.Id, $"This does not look like domain name. I understand only `*.ton` and `*.t.me` domains.{Environment.NewLine}Try `foundation.ton` for example.") { ParseMode = SendMessage.ParseModeEnum.Markdown });
             }
         }
 
@@ -85,9 +85,9 @@ namespace TonDomainInfoBot.Telegram
                 await tonClient.InitIfNeeded().ConfigureAwait(false);
                 var info = await executor(tonClient, domain).ConfigureAwait(false);
 
-                var json = JsonSerializer.Serialize(info, jsonOptions).Replace("\r\n  ", "\r\n");
+                var json = JsonSerializer.Serialize(info, jsonOptions).Replace(Environment.NewLine + "  ", Environment.NewLine);
 
-                await SendAsync(new SendMessage(message.Chat.Id, "```\r\n" + json + "\r\n```") { ParseMode = SendMessage.ParseModeEnum.Markdown });
+                await SendAsync(new SendMessage(message.Chat.Id, "```" + Environment.NewLine + json + Environment.NewLine + "```") { ParseMode = SendMessage.ParseModeEnum.Markdown });
             }
             catch (ArgumentOutOfRangeException ex)
             {
@@ -95,11 +95,11 @@ namespace TonDomainInfoBot.Telegram
             }
             catch (TonClientException ex)
             {
-                await SendAsync(new SendMessage(message.Chat.Id, $"{Emoji.CryingFace} Error from TonLib: {ex.Message}\r\n\r\nSometimes public nodes fail, feel free to retry."));
+                await SendAsync(new SendMessage(message.Chat.Id, $"{Emoji.CryingFace} Error from TonLib: {ex.Message}{Environment.NewLine}{Environment.NewLine}Sometimes public nodes fail, feel free to retry."));
             }
             catch (Exception ex)
             {
-                await SendAsync(new SendMessage(message.Chat.Id, $"{Emoji.StopSign} {ex.Message}\r\n\r\nPlease retry, if problem persists - contact @just-dmitry"));
+                await SendAsync(new SendMessage(message.Chat.Id, $"{Emoji.StopSign} {ex.Message}{Environment.NewLine}{Environment.NewLine}Please retry, if problem persists - contact @just_dmitry"));
             }
         }
     }

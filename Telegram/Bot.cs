@@ -47,23 +47,21 @@ namespace TonDomainInfoBot.Telegram
                 return SendAsync(new SendMessage(message.Chat.Id, "Only text messages are supported"));
             }
 
-            if (text.IndexOf(' ') != -1)
+            if (TonRecipes.TelegramNumbers.TryNormalizeName(text, out var number))
             {
-                return SendAsync(new SendMessage(message.Chat.Id, "Please, send only domain name (without other words, formatting etc.), for example `foundation.ton`.") { ParseMode = SendMessage.ParseModeEnum.Markdown });
+                return AnswerDomain(message, text, "+" + number, "anonymous number", (tc, d) => TonRecipes.TelegramNumbers.GetAllInfoByName(tc, number), info => info.Address);
             }
-
-            text = text.TrimEnd('.').ToLowerInvariant();
-            if (text.EndsWith(".ton"))
+            else if (TonRecipes.TelegramUsernames.TryNormalizeName(text, out var username))
             {
-                return AnswerDomain(message, text, d => TonRecipes.RootDns.GetNftIndex(d), (tc, d) => TonRecipes.RootDns.GetAllInfoByName(tc, d));
+                return AnswerDomain(message, text, username + ".t.me", "username", (tc, d) => TonRecipes.TelegramUsernames.GetAllInfoByName(tc, username), info => info.Address);
             }
-            else if (text.EndsWith(".t.me"))
+            else if (TonRecipes.RootDns.TryNormalizeName(text, out var domainName))
             {
-                return AnswerDomain(message, text, d => TonRecipes.Telemint.GetNftIndex(d), (tc, d) => TonRecipes.Telemint.GetAllInfoByName(tc, d));
+                return AnswerDomain(message, text, domainName + ".ton", "domain", (tc, d) => TonRecipes.RootDns.GetAllInfoByName(tc, domainName), info => info.Address);
             }
             else
             {
-                return SendAsync(new SendMessage(message.Chat.Id, $"This does not look like domain name. I understand only `*.ton` and `*.t.me` domains.{Environment.NewLine}Try `foundation.ton` for example.") { ParseMode = SendMessage.ParseModeEnum.Markdown });
+                return SendAsync(new SendMessage(message.Chat.Id, $"This does not look like domain name or anonymous number. I understand only `*.ton` and `*.t.me` domains, and `+888...` numbers.{Environment.NewLine}Try `foundation.ton` for example.") { ParseMode = SendMessage.ParseModeEnum.Markdown });
             }
         }
 
@@ -72,22 +70,35 @@ namespace TonDomainInfoBot.Telegram
             return SendAsync(new SendMessage(chat.Id, "I do not understand, sorry"));
         }
 
-        protected async Task AnswerDomain<TAnswer>(Message message, string domain, Action<string> validator, Func<ITonClient, string, Task<TAnswer>> executor)
+        protected async Task AnswerDomain<TAnswer>(Message message,
+            string domain,
+            string normalizedDomain,
+            string typeName,
+            Func<ITonClient, string, Task<TAnswer>> executor,
+            Func<TAnswer, string> addressExtractor)
         {
             try
             {
-                validator(domain);
-
-                logger.LogInformation("Reading {Domain}...", domain);
+                logger.LogInformation("Reading {Domain} / {NormalizedDomain}...", domain, normalizedDomain);
 
                 await SendAsync(new SendChatAction(message.Chat.Id, "typing")).ConfigureAwait(false);
 
                 await tonClient.InitIfNeeded().ConfigureAwait(false);
                 var info = await executor(tonClient, domain).ConfigureAwait(false);
 
+                // trim starting spaces in every line
                 var json = JsonSerializer.Serialize(info, jsonOptions).Replace(Environment.NewLine + "  ", Environment.NewLine);
 
-                await SendAsync(new SendMessage(message.Chat.Id, "```" + Environment.NewLine + json + Environment.NewLine + "```") { ParseMode = SendMessage.ParseModeEnum.Markdown });
+                // build message
+                var text = string.Join(
+                    Environment.NewLine,
+                    $"Information for {typeName} [{normalizedDomain}](https://tonscan.org/address/{addressExtractor(info)}):",
+                    string.Empty,
+                    "```",
+                    json,
+                    "```");
+
+                await SendAsync(new SendMessage(message.Chat.Id, text) { ParseMode = SendMessage.ParseModeEnum.Markdown, DisableWebPagePreview = true });
             }
             catch (ArgumentOutOfRangeException ex)
             {

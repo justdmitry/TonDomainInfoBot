@@ -11,7 +11,7 @@
   <ItemGroup>
     <PackageReference Include="NetTelegramBotApi" Version="5.2.0" />
     <PackageReference Include="NetTelegramBot.Framework" Version="3.0.0-rc8" />
-    <PackageReference Include="TonLib.Net" Version="0.17.0" />
+    <PackageReference Include="TonLib.Net" Version="0.18.1" />
   </ItemGroup>
 
   <ItemGroup>

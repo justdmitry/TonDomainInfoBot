@@ -1,20 +1,42 @@
-﻿namespace TonDomainInfoBot
+﻿using NetTelegramBotApi;
+using TonLibDotNet;
+using TonLibDotNet.Types;
+
+namespace TonDomainInfoBot
 {
     public static class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
-            var host = CreateHostBuilder(args).Build();
+            var builder = Host.CreateApplicationBuilder(args);
 
-            host.Run();
+            builder.Logging.AddSystemdConsole();
+
+            ConfigureServices(builder.Services, builder.Configuration);
+
+            var app = builder.Build();
+
+            await app.RunAsync();
         }
 
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureLogging(builder => builder.AddSystemdConsole())
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.UseStartup<Startup>();
-                });
+        private static void ConfigureServices(IServiceCollection services, ConfigurationManager configuration)
+        {
+            var tempDir = configuration["TonClientTempDir"];
+
+            services.Configure<TonOptions>(o =>
+            {
+                o.UseMainnet = true;
+                o.ConfigPathMainnet = new("https://ton.org/global.config.json");
+                o.Options.KeystoreType = new KeyStoreTypeDirectory(tempDir ?? ".");
+            });
+
+            services.AddSingleton<ITonClient, TonClient>();
+
+            services.AddHttpClient<ITelegramBot, Bot>();
+
+            services.AddTask<BotTask>(o => o.AutoStart(BotTask.Interval, TimeSpan.FromSeconds(3)));
+
+            services.AddTask<ReconnectTask>(o => o.AutoStart(ReconnectTask.Interval));
+        }
     }
 }
